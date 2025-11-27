@@ -27,75 +27,91 @@ public class SecurityConfig {
         this.userDetailsService = userDetailsService;
     }
 
-   @Bean
-public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-    http
-        .cors(cors -> {}) // ✅ enable CORS support
-        .csrf(csrf -> csrf.disable()) // ✅ disable CSRF for now
-        .authorizeHttpRequests(auth -> auth
-            // Public routes
-            .requestMatchers("/", "/home", "/index", "/error").permitAll()
-            .requestMatchers("/api/auth/**", "/api/contact/**").permitAll()
-            .requestMatchers("/css/**", "/js/**", "/images/**").permitAll() // static resources
-            
-            // Protected routes  
-            .anyRequest().authenticated()
-        )
-        .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-        .authenticationProvider(authenticationProvider())
-        .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
-
-    return http.build();
-}
-
+    // -----------------------------
+    // MAIN SECURITY FILTER CHAIN
+    // -----------------------------
     @Bean
-    public AuthenticationProvider authenticationProvider() {
-        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
-        authProvider.setUserDetailsService(userDetailsService);
-        authProvider.setPasswordEncoder(passwordEncoder());
-        return authProvider;
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+
+        http
+            .cors(cors -> {})   // enable CORS
+            .csrf(csrf -> csrf.disable())
+            .authorizeHttpRequests(auth -> auth
+
+                // Public APIs
+                .requestMatchers("/", "/home", "/index", "/error").permitAll()
+                .requestMatchers("/api/auth/**", "/api/contact/**").permitAll()
+
+                // static files
+                .requestMatchers("/css/**", "/js/**", "/images/**").permitAll()
+
+                // all others need authentication
+                .anyRequest().authenticated()
+            )
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authenticationProvider(authenticationProvider())
+            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+
+        return http.build();
     }
 
+    // -----------------------------
+    // PASSWORD ENCODER
+    // -----------------------------
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
+    // -----------------------------
+    // AUTH MANAGER
+    // -----------------------------
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
     }
 
-    // ✅ Proper CORS configuration
-//     @Bean
-//     public CorsFilter corsFilter() {
-//         CorsConfiguration corsConfiguration = new CorsConfiguration();
-//         corsConfiguration.setAllowCredentials(true);
-//         corsConfiguration.addAllowedOrigin("http://localhost:5173");
-//         corsConfiguration.addAllowedHeader("*");
-//         corsConfiguration.addAllowedMethod("*");
+    // -----------------------------
+    // AUTH PROVIDER
+    // -----------------------------
+    @Bean
+    public AuthenticationProvider authenticationProvider() {
 
-//         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-//         source.registerCorsConfiguration("/**", corsConfiguration);
-//         return new CorsFilter(source);
-//     }
-// }
-// ✅ EVEN BETTER - Use allowedOriginPatterns
-@Bean
-public CorsFilter corsFilter() {
-    CorsConfiguration corsConfiguration = new CorsConfiguration();
-    corsConfiguration.setAllowCredentials(true);
-    corsConfiguration.addAllowedOriginPattern("https://*.codegemi.com"); // ✅ All subdomains
-    corsConfiguration.addAllowedOriginPattern("http://*.codegemi.com");  // ✅ HTTP subdomains
-    corsConfiguration.addAllowedOrigin("http://localhost:5173");
-    corsConfiguration.addAllowedHeader("*");
-    corsConfiguration.addAllowedMethod("*");
+        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
 
-    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-    source.registerCorsConfiguration("/**", corsConfiguration);
-    return new CorsFilter(source);
+        authProvider.setUserDetailsService(userDetailsService);
+        authProvider.setPasswordEncoder(passwordEncoder());
+
+        return authProvider;
+    }
+
+    // -----------------------------
+    // GLOBAL CORS CONFIG
+    // -----------------------------
+    @Bean
+    public CorsFilter corsFilter() {
+
+        CorsConfiguration cors = new CorsConfiguration();
+
+        cors.setAllowCredentials(true);
+
+        // ⭐ Allow your Hostinger React domain (replace with your actual domain)
+        cors.addAllowedOriginPattern("https://*.codegemi.com");
+        cors.addAllowedOriginPattern("http://*.codegemi.com");
+
+        // ⭐ Local development allowed
+        cors.addAllowedOrigin("http://localhost:5173");
+
+        cors.addAllowedHeader("*");
+        cors.addAllowedMethod("*");
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", cors);
+
+        return new CorsFilter(source);
+    }
 }
-}
+
 
 // package com.itservices_backend.config;
 
